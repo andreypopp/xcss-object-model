@@ -73,8 +73,16 @@ Rule.prototype.map = function(fn) {
   return new Rule(this.selectors, this.declarations.map(fn));
 }
 
+Rule.prototype.mapSelectors = function(fn) {
+  return new Rule(this.selectors.map(fn), this.declarations);
+}
+
 Rule.prototype.flatMap = function(fn) {
   return new Rule(this.selectors, flatMap(this.declarations, fn));
+}
+
+Rule.prototype.flatMapSelectors = function(fn) {
+  return new Rule(flatMap(this.selectors, fn), this.declarations);
 }
 
 function Import(stylesheet) {
