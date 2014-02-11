@@ -23,5 +23,10 @@
     "semver": "~2.2.1",
     "jshint": "~2.4.3",
     "jspecs": "~0.2.0"
+  },
+  "dependencies": {
+    "flatmap": "0.0.3",
+    "deep-freeze": "0.0.1",
+    "css-stringify": "~1.4.1"
   }
 }
