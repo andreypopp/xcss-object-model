@@ -3,11 +3,11 @@
  * Rule inheritance transform.
  */
 
-var Map = require('es6-collections').Map;
+var collections = require('es6-collections');
 
 module.exports = function(stylesheet) {
   var index = {};
-  var changeset = new Map();
+  var changeset = new collections.Map();
 
   function storeIndex(k, v) {
     (index[k] || (index[k] = [])).push(v);
