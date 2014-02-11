@@ -80,7 +80,7 @@ module.exports = function(stylesheet) {
   }
 
   return stylesheet.map(function(rule) {
-    var rule = update(rule);
+    rule = update(rule);
     return (typeof rule.mapRules === 'function') ? rule.mapRules(update) : rule;
   });
 }
