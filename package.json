@@ -27,6 +27,7 @@
   "dependencies": {
     "flatmap": "0.0.3",
     "deep-freeze": "0.0.1",
-    "css-stringify": "~1.4.1"
+    "css-stringify": "~1.4.1",
+    "es6-collections": "~0.2.0"
   }
 }

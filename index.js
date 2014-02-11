@@ -29,12 +29,45 @@ Stylesheet.prototype.filter = function(fn) {
   return new Stylesheet(this.vars, this.rules.filter(fn));
 }
 
+Stylesheet.prototype.filterRules = function(fn) {
+  var rules = [];
+  for (var i = 0, len = this.rules.length; i < len; i++) {
+    var rule = this.rules[i];
+    if (typeof rule.filterRules === 'function') {
+      rules.push(rule.filterRules(fn));
+    } else {
+      if (fn(rule)) rules.push(rule);
+    }
+  }
+  return new Stylesheet(this.vars, rules);
+}
+
 Stylesheet.prototype.map = function(fn) {
   return new Stylesheet(this.vars, this.rules.map(fn));
 }
 
+Stylesheet.prototype.mapRules = function(fn) {
+  var rules = [];
+  for (var i = 0, len = this.rules.length; i < len; i++) {
+    var rule = this.rules[i];
+    rules.push(typeof rule.mapRules === 'function' ? rule.mapRules(fn) : fn(rule));
+  }
+  return new Stylesheet(this.vars, rules);
+}
+
 Stylesheet.prototype.flatMap = function(fn) {
   return new Stylesheet(this.vars, flatMap(this.rules, fn));
+}
+
+Stylesheet.prototype.flatMapRules = function(fn) {
+  var rules = flatMap(this.rules, function(rule) {
+    if (typeof rule.flatMapRules === 'function') {
+      return rule.flatMapRules(fn);
+    } else  {
+      return fn(rule);
+    }
+  });
+  return new Stylesheet(this.vars, rules);
 }
 
 Stylesheet.prototype.toCSS = function(options) {
@@ -48,6 +81,24 @@ Stylesheet.prototype.toCSS = function(options) {
 Stylesheet.prototype.concat = function(stylesheet) {
   var rules = stylesheet.rules || stylesheet;
   return new Stylesheet(this.vars, this.rules.concat(rules));
+}
+
+function Media(media, rules) {
+  this.type = 'media';
+  this.media = media;
+  this.rules = rules;
+}
+
+Media.prototype.filter = Media.prototype.filterRules = function(fn) {
+  return new Media(this.media, this.rules.filter(fn));
+}
+
+Media.prototype.map = Media.prototype.mapRules = function(fn) {
+  return new Media(this.media, this.rules.map(fn));
+}
+
+Media.prototype.flatMap = Media.prototype.flatMapRules = function(fn) {
+  return new Media(this.media, flatMap(this.rules, fn));
 }
 
 function Rule(selectors, declarations) {
@@ -97,6 +148,10 @@ function Extend(selector) {
 
 function stylesheet(vars) {
   return new Stylesheet(vars, toArray(arguments).slice(1));
+}
+
+function media(condition) {
+  return new Media(condition, toArray(arguments).slice(1));
 }
 
 function rule() {
@@ -156,11 +211,13 @@ module.exports = {
   Import: Import,
   Rule: Rule,
   Stylesheet: Stylesheet,
+  Media: Media,
 
   // factories
+  module: mod,
   extend: extend,
   import: imp,
   rule: rule,
   stylesheet: stylesheet,
-  module: mod,
+  media: media
 };

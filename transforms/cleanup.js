@@ -7,8 +7,8 @@
 
 module.exports = function(stylesheet) {
   return stylesheet
-    .map(removePlaceholderSelectors)
-    .filter(function(rule) {
+    .mapRules(removePlaceholderSelectors)
+    .filterRules(function(rule) {
       return rule.selectors.length > 0 && rule.declarations.length > 0;
     });
 }
