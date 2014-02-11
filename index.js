@@ -25,8 +25,14 @@ Stylesheet.prototype.transform = function(fn) {
   return fn(this);
 }
 
+Stylesheet.prototype.addRule = function(rule) {
+  return new Stylesheet(this.vars, this.rules.concat(rule));
+}
+
 Stylesheet.prototype.filter = function(fn) {
-  return new Stylesheet(this.vars, this.rules.filter(fn));
+  return new Stylesheet(this.vars, this.rules.filter(function(rule, i) {
+    return fn(rule, i, this);
+  }, this));
 }
 
 Stylesheet.prototype.filterRules = function(fn) {
@@ -36,37 +42,41 @@ Stylesheet.prototype.filterRules = function(fn) {
     if (typeof rule.filterRules === 'function') {
       rules.push(rule.filterRules(fn));
     } else {
-      if (fn(rule)) rules.push(rule);
+      if (fn(rule, i, this)) rules.push(rule);
     }
   }
   return new Stylesheet(this.vars, rules);
 }
 
 Stylesheet.prototype.map = function(fn) {
-  return new Stylesheet(this.vars, this.rules.map(fn));
+  return new Stylesheet(this.vars, this.rules.map(function(rule, i) {
+    return fn(rule, i, this);
+  }, this));
 }
 
 Stylesheet.prototype.mapRules = function(fn) {
   var rules = [];
   for (var i = 0, len = this.rules.length; i < len; i++) {
     var rule = this.rules[i];
-    rules.push(typeof rule.mapRules === 'function' ? rule.mapRules(fn) : fn(rule));
+    rules.push(typeof rule.mapRules === 'function' ? rule.mapRules(fn) : fn(rule, i, this));
   }
   return new Stylesheet(this.vars, rules);
 }
 
 Stylesheet.prototype.flatMap = function(fn) {
-  return new Stylesheet(this.vars, flatMap(this.rules, fn));
+  return new Stylesheet(this.vars, flatMap(this.rules, function(rule, i) {
+    return fn(rule, i, this);
+  }, this));
 }
 
 Stylesheet.prototype.flatMapRules = function(fn) {
-  var rules = flatMap(this.rules, function(rule) {
+  var rules = flatMap(this.rules, function(rule, i) {
     if (typeof rule.flatMapRules === 'function') {
       return rule.flatMapRules(fn);
     } else  {
-      return fn(rule);
+      return fn(rule, i, this);
     }
-  });
+  }, this);
   return new Stylesheet(this.vars, rules);
 }
 
@@ -89,16 +99,26 @@ function Media(media, rules) {
   this.rules = rules;
 }
 
+Media.prototype.addRule = function(rule) {
+  return new Media(this.media, this.rules.concat(rule));
+}
+
 Media.prototype.filter = Media.prototype.filterRules = function(fn) {
-  return new Media(this.media, this.rules.filter(fn));
+  return new Media(this.media, this.rules.filter(function(rule, i) {
+    return fn(rule, i, this);
+  }, this));
 }
 
 Media.prototype.map = Media.prototype.mapRules = function(fn) {
-  return new Media(this.media, this.rules.map(fn));
+  return new Media(this.media, this.rules.map(function(rule, i) {
+    return fn(rule, i, this);
+  }, this));
 }
 
 Media.prototype.flatMap = Media.prototype.flatMapRules = function(fn) {
-  return new Media(this.media, flatMap(this.rules, fn));
+  return new Media(this.media, flatMap(this.rules, function(rule, i) {
+    return fn(rule, i, this);
+  }, this));
 }
 
 function Rule(selectors, declarations) {
@@ -112,28 +132,51 @@ Rule.prototype.addSelector = function(selector) {
   return new Rule(selectors, this.declarations);
 }
 
-Rule.prototype.filter = function(fn) {
-  return new Rule(this.selectors, this.declarations.filter(fn));
+Rule.prototype.addDeclaration = function(declaration) {
+  var declarations = this.declarations.concat(declaration);
+  return new Rule(this.selectors, declarations);
+}
+
+Rule.prototype.filter = Rule.prototype.filterDeclarations = function(fn) {
+  var declarations = this.declarations.filter(function(declaration, i) {
+    return fn(declaration, i, this);
+  }, this);
+  return new Rule(this.selectors, declarations);
 }
 
 Rule.prototype.filterSelectors = function(fn) {
-  return new Rule(this.selectors.filter(fn), this.declarations);
+  var selectors = this.selectors.filter(function(selector, i) {
+    return fn(selector, i, this);
+  }, this);
+  return new Rule(selectors, this.declarations);
 }
 
-Rule.prototype.map = function(fn) {
-  return new Rule(this.selectors, this.declarations.map(fn));
+Rule.prototype.map = Rule.prototype.mapDeclarations = function(fn) {
+  var declarations = this.declarations.map(function(declaration, i) {
+    return fn(declaration, i, this);
+  }, this);
+  return new Rule(this.selectors, declarations);
 }
 
 Rule.prototype.mapSelectors = function(fn) {
-  return new Rule(this.selectors.map(fn), this.declarations);
+  var selectors = this.selectors.map(function(selector, i) {
+    return fn(selector, i, this);
+  }, this);
+  return new Rule(selectors, this.declarations);
 }
 
-Rule.prototype.flatMap = function(fn) {
-  return new Rule(this.selectors, flatMap(this.declarations, fn));
+Rule.prototype.flatMap = Rule.prototype.flatMapDeclarations = function(fn) {
+  var declarations = flatMap(this.declarations, function(declaration, i) {
+    return fn(declaration, i, this);
+  }, this);
+  return new Rule(this.selectors, declarations);
 }
 
 Rule.prototype.flatMapSelectors = function(fn) {
-  return new Rule(flatMap(this.selectors, fn), this.declarations);
+  var selectors = flatMap(this.selectors, function(selector, i) {
+    return fn(selector, i, this);
+  }, this);
+  return new Rule(selectors, this.declarations);
 }
 
 function Import(stylesheet) {
