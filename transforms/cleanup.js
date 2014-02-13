@@ -9,12 +9,13 @@ module.exports = function(stylesheet) {
   return stylesheet
     .mapRules(removePlaceholderSelectors)
     .filterRules(function(rule) {
-      return rule.selectors.length > 0 && rule.declarations.length > 0;
+      return !rule.selectors ||
+        rule.selectors && rule.selectors.length > 0 && rule.declarations.length > 0;
     });
 }
 
 function removePlaceholderSelectors(rule) {
-  return rule.filterSelectors(function(selector){
-    return !/%[a-zA-Z]/.exec(selector);
-  });
+  return rule.filterSelectors ? 
+    rule.filterSelectors(function(selector){return !/%[a-zA-Z]/.exec(selector)}) :
+    rule;
 }

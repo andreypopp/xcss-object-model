@@ -6,7 +6,7 @@
 module.exports = function linearize(stylesheet, seen) {
   seen = seen || [];
   return stylesheet.flatMapRules(function(rule) {
-    if (rule.type === 'import') {
+    if (rule.type === 'importModule') {
       if (seen.indexOf(rule.stylesheet) > -1) return [];
       seen.push(rule.stylesheet);
       return linearize(rule.stylesheet, seen).rules;

@@ -4,11 +4,20 @@
  */
 
 var stringify = require('css-stringify');
-var flatMap   = require('flatmap');
+var assign    = require('lodash').assign;
 
-var inheritance = require('./transforms/rule-inheritance');
-var cleanup     = require('./transforms/cleanup');
-var linearize   = require('./transforms/linearize-imports');
+var makeContainer   = require('./container');
+var RuleList        = makeContainer('rule');
+var DeclarationList = makeContainer('declaration');
+var KeyframeList    = makeContainer('keyframe');
+var SelectorList    = makeContainer('selector');
+
+var makeNestedContainer = require('./nested-container');
+var NestedRuleList      = makeNestedContainer('rule');
+
+var inheritance     = require('./transforms/rule-inheritance');
+var cleanup         = require('./transforms/cleanup');
+var linearize       = require('./transforms/linearize-imports');
 
 function Stylesheet(vars, rules) {
   this.type = 'stylesheet';
@@ -21,77 +30,29 @@ function Stylesheet(vars, rules) {
   }
 }
 
-Stylesheet.prototype.transform = function(fn, options) {
-  return fn(this, options);
-}
+assign(Stylesheet.prototype, RuleList, NestedRuleList.WithSuffix, {
 
-Stylesheet.prototype.addRule = function(rule) {
-  return new Stylesheet(this.vars, this.rules.concat(rule));
-}
+  withRules: function(rules) {
+    return new Stylesheet(this.vars, rules);
+  },
 
-Stylesheet.prototype.filter = function(fn) {
-  return new Stylesheet(this.vars, this.rules.filter(function(rule, i) {
-    return fn(rule, i, this);
-  }, this));
-}
+  concat: function(stylesheet) {
+    var rules = stylesheet.rules || stylesheet;
+    return new Stylesheet(this.vars, this.rules.concat(rules));
+  },
 
-Stylesheet.prototype.filterRules = function(fn) {
-  var rules = [];
-  for (var i = 0, len = this.rules.length; i < len; i++) {
-    var rule = this.rules[i];
-    if (typeof rule.filterRules === 'function') {
-      rules.push(rule.filterRules(fn));
-    } else {
-      if (fn(rule, i, this)) rules.push(rule);
-    }
+  transform: function(fn, options) {
+    return fn(this, options);
+  },
+
+  toCSS: function(options) {
+    var stylesheet = this
+      .transform(linearize)
+      .transform(inheritance)
+      .transform(cleanup);
+    return stringify({type: 'stylesheet', stylesheet: stylesheet}, options);
   }
-  return new Stylesheet(this.vars, rules);
-}
-
-Stylesheet.prototype.map = function(fn) {
-  return new Stylesheet(this.vars, this.rules.map(function(rule, i) {
-    return fn(rule, i, this);
-  }, this));
-}
-
-Stylesheet.prototype.mapRules = function(fn) {
-  var rules = [];
-  for (var i = 0, len = this.rules.length; i < len; i++) {
-    var rule = this.rules[i];
-    rules.push(typeof rule.mapRules === 'function' ? rule.mapRules(fn) : fn(rule, i, this));
-  }
-  return new Stylesheet(this.vars, rules);
-}
-
-Stylesheet.prototype.flatMap = function(fn) {
-  return new Stylesheet(this.vars, flatMap(this.rules, function(rule, i) {
-    return fn(rule, i, this);
-  }, this));
-}
-
-Stylesheet.prototype.flatMapRules = function(fn) {
-  var rules = flatMap(this.rules, function(rule, i) {
-    if (typeof rule.flatMapRules === 'function') {
-      return rule.flatMapRules(fn);
-    } else  {
-      return fn(rule, i, this);
-    }
-  }, this);
-  return new Stylesheet(this.vars, rules);
-}
-
-Stylesheet.prototype.toCSS = function(options) {
-  var stylesheet = this
-    .transform(linearize)
-    .transform(inheritance)
-    .transform(cleanup);
-  return stringify({type: 'stylesheet', stylesheet: stylesheet}, options);
-}
-
-Stylesheet.prototype.concat = function(stylesheet) {
-  var rules = stylesheet.rules || stylesheet;
-  return new Stylesheet(this.vars, this.rules.concat(rules));
-}
+});
 
 function Media(media, rules) {
   this.type = 'media';
@@ -99,27 +60,65 @@ function Media(media, rules) {
   this.rules = rules;
 }
 
-Media.prototype.addRule = function(rule) {
-  return new Media(this.media, this.rules.concat(rule));
+assign(Media.prototype, RuleList, RuleList.WithSuffix, {
+
+  withRules: function(rules) {
+    return new Media(this.media, rules);
+  }
+});
+
+function Supports(supports, rules) {
+  this.type = 'supports';
+  this.supports = supports;
+  this.rules = rules;
 }
 
-Media.prototype.filter = Media.prototype.filterRules = function(fn) {
-  return new Media(this.media, this.rules.filter(function(rule, i) {
-    return fn(rule, i, this);
-  }, this));
+assign(Supports.prototype, RuleList, RuleList.WithSuffix, {
+
+  withRules: function(rules) {
+    return new Supports(this.supports, rules);
+  }
+});
+
+function Document(document, rules, vendor) {
+  this.type = 'document';
+  this.document = document;
+  this.rules = rules;
+  this.vendor = vendor;
 }
 
-Media.prototype.map = Media.prototype.mapRules = function(fn) {
-  return new Media(this.media, this.rules.map(function(rule, i) {
-    return fn(rule, i, this);
-  }, this));
+assign(Document.prototype, RuleList, RuleList.WithSuffix, {
+
+  withRules: function(rules) {
+    return new Document(this.document, rules, this.vendor);
+  }
+});
+
+function Host(rules) {
+  this.type = 'host';
+  this.rules = rules;
 }
 
-Media.prototype.flatMap = Media.prototype.flatMapRules = function(fn) {
-  return new Media(this.media, flatMap(this.rules, function(rule, i) {
-    return fn(rule, i, this);
-  }, this));
+assign(Host.prototype, RuleList, RuleList.WithSuffix, {
+
+  withRules: function(rules) {
+    return new Host(rules);
+  }
+});
+
+function Keyframes(name, keyframes, vendor) {
+  this.type = 'keyframes';
+  this.name = name;
+  this.keyframes = keyframes;
+  this.vendor = vendor;
 }
+
+assign(Keyframes.prototype, KeyframeList, KeyframeList.WithSuffix, {
+
+  withKeyframes: function(keyframes) {
+    return new Keyframes(this.name, keyframes, this.vendor);
+  }
+});
 
 function Rule(selectors, declarations) {
   this.type = 'rule';
@@ -127,67 +126,46 @@ function Rule(selectors, declarations) {
   this.declarations = declarations;
 }
 
-Rule.prototype.addSelector = function(selector) {
-  var selectors = this.selectors.concat(selector);
-  return new Rule(selectors, this.declarations);
+assign(Rule.prototype, SelectorList.WithSuffix, DeclarationList, DeclarationList.WithSuffix, {
+
+  withDeclarations: function(declarations) {
+    return new Rule(this.selectors, declarations);
+  },
+
+  withSelectors: function(selectors) {
+    return new Rule(selectors, this.declarations);
+  }
+});
+
+function Page(selectors, declarations) {
+  this.type = 'page';
+  this.selectors = selectors;
+  this.declarations = declarations;
 }
 
-Rule.prototype.addDeclaration = function(declaration) {
-  var declarations = this.declarations.concat(declaration);
-  return new Rule(this.selectors, declarations);
+assign(Page.prototype, SelectorList.WithSuffix, DeclarationList, DeclarationList.WithSuffix, {
+
+  withDeclarations: function(declarations) {
+    return new Page(this.selectors, declarations);
+  },
+
+  withSelectors: function(selectors) {
+    return new Page(selectors, this.declarations);
+  }
+});
+
+function Keyframe(values, declarations) {
+  this.type = 'keyframe';
+  this.values = values;
+  this.declarations = declarations;
 }
 
-Rule.prototype.filter = Rule.prototype.filterDeclarations = function(fn) {
-  var declarations = this.declarations.filter(function(declaration, i) {
-    return fn(declaration, i, this);
-  }, this);
-  return new Rule(this.selectors, declarations);
-}
+assign(Keyframe.prototype, DeclarationList, DeclarationList.WithSuffix, {
 
-Rule.prototype.filterSelectors = function(fn) {
-  var selectors = this.selectors.filter(function(selector, i) {
-    return fn(selector, i, this);
-  }, this);
-  return new Rule(selectors, this.declarations);
-}
-
-Rule.prototype.map = Rule.prototype.mapDeclarations = function(fn) {
-  var declarations = this.declarations.map(function(declaration, i) {
-    return fn(declaration, i, this);
-  }, this);
-  return new Rule(this.selectors, declarations);
-}
-
-Rule.prototype.mapSelectors = function(fn) {
-  var selectors = this.selectors.map(function(selector, i) {
-    return fn(selector, i, this);
-  }, this);
-  return new Rule(selectors, this.declarations);
-}
-
-Rule.prototype.flatMap = Rule.prototype.flatMapDeclarations = function(fn) {
-  var declarations = flatMap(this.declarations, function(declaration, i) {
-    return fn(declaration, i, this);
-  }, this);
-  return new Rule(this.selectors, declarations);
-}
-
-Rule.prototype.flatMapSelectors = function(fn) {
-  var selectors = flatMap(this.selectors, function(selector, i) {
-    return fn(selector, i, this);
-  }, this);
-  return new Rule(selectors, this.declarations);
-}
-
-function Import(stylesheet) {
-  this.type = 'import';
-  this.stylesheet = stylesheet;
-}
-
-function Extend(selector) {
-  this.type = 'extend';
-  this.selector = selector;
-}
+  withDeclarations: function(declarations) {
+    return new Keyframe(this.values, declarations);
+  }
+});
 
 function stylesheet(vars) {
   return new Stylesheet(vars, toArray(arguments).slice(1));
@@ -195,6 +173,26 @@ function stylesheet(vars) {
 
 function media(condition) {
   return new Media(condition, toArray(arguments).slice(1));
+}
+
+function supports(sup) {
+  return new Supports(sup, toArray(arguments).slice(1));
+}
+
+function document(doc) {
+  return new Document(doc, toArray(arguments).slice(1));
+}
+
+function host() {
+  return new Host(toArray(arguments));
+}
+
+function keyframes(name) {
+  return new Document(name, toArray(arguments).slice(1));
+}
+
+function importReference(imp) {
+  return {type: 'import', import: imp};
 }
 
 function rule() {
@@ -221,12 +219,68 @@ function rule() {
   return new Rule(selectors, declarations);
 }
 
+function page() {
+  var selectors = [];
+  var declarations = [];
+
+  toArray(arguments).forEach(function(arg) {
+    if (isString(arg)) {
+      if (declarations.length > 0) {
+        throw new Error('selector values goes after declaration');
+      }
+      selectors.push(arg);
+    } else {
+      if (!arg.type) {
+        for (var k in arg) {
+          declarations.push({type: 'declaration', property: k, value: arg[k]});
+        }
+      } else {
+        declarations.push(arg);
+      }
+    }
+  });
+
+  return new Page(selectors, declarations);
+}
+
+function keyframe() {
+  var values = [];
+  var declarations = [];
+
+  toArray(arguments).forEach(function(arg) {
+    if (isString(arg)) {
+      if (declarations.length > 0) {
+        throw new Error('keyframe values goes after declaration');
+      }
+      values.push(arg);
+    } else {
+      if (!arg.type) {
+        for (var k in arg) {
+          declarations.push({type: 'declaration', property: k, value: arg[k]});
+        }
+      } else {
+        declarations.push(arg);
+      }
+    }
+  });
+
+  return new Rule(values, declarations);
+}
+
 function imp(stylesheet) {
-  return new Import(stylesheet);
+  return {type: 'importModule', stylesheet: stylesheet};
+}
+
+function charset(cset) {
+  return {type: 'charset', charset: cset};
+}
+
+function namespace(ns) {
+  return {type: 'namespace', namespace: ns};
 }
 
 function extend(selector) {
-  return new Extend(selector);
+  return {type: 'extend', selector: selector};
 }
 
 function mod(func) {
@@ -249,18 +303,19 @@ function isString(o) {
 }
 
 module.exports = {
-  // classes
-  Extend: Extend,
-  Import: Import,
-  Rule: Rule,
-  Stylesheet: Stylesheet,
-  Media: Media,
-
-  // factories
   module: mod,
   extend: extend,
   import: imp,
+  importReference: importReference,
+  charset: charset,
   rule: rule,
   stylesheet: stylesheet,
-  media: media
+  media: media,
+  document: document,
+  host: host,
+  namespace: namespace,
+  keyframe: keyframe,
+  keyframes: keyframes,
+  page: page,
+  supports: supports
 };
