@@ -21,8 +21,8 @@ function Stylesheet(vars, rules) {
   }
 }
 
-Stylesheet.prototype.transform = function(fn) {
-  return fn(this);
+Stylesheet.prototype.transform = function(fn, options) {
+  return fn(this, options);
 }
 
 Stylesheet.prototype.addRule = function(rule) {
