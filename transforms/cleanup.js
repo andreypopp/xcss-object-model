@@ -9,8 +9,8 @@ module.exports = function(stylesheet) {
   return stylesheet
     .mapRules(removePlaceholderSelectors)
     .filterRules(function(rule) {
-      return !rule.selectors ||
-        rule.selectors && rule.selectors.length > 0 && rule.declarations.length > 0;
+      var isRule = rule.type === 'rule';
+      return !isRule || isRule && rule.selectors.length > 0 && rule.declarations.length > 0;
     });
 }
 
