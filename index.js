@@ -188,7 +188,7 @@ function host() {
 }
 
 function keyframes(name) {
-  return new Document(name, toArray(arguments).slice(1));
+  return new Keyframes(name, toArray(arguments).slice(1));
 }
 
 function importReference(imp) {
